@@ -257,7 +257,7 @@
             background: #f8fbff;
         }
 
-        .key-cell, .version-cell {
+        .key-cell {
             word-break: break-word;
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         }
@@ -420,13 +420,12 @@
                                     Modified <span class="sort-indicator" aria-hidden="true"></span>
                                 </button>
                             </th>
-                            <th>VersionId</th>
-                            <th style="width: 150px;">Actions</th>
+                            <th style="width: 190px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="s3-versions-body">
                         <tr>
-                            <td colspan="7" class="empty-state">Sign in to load release files.</td>
+                            <td colspan="6" class="empty-state">Sign in to load release files.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -634,7 +633,7 @@
             if (!filtered.length) {
                 const row = document.createElement('tr');
                 const cell = document.createElement('td');
-                cell.colSpan = 7;
+                cell.colSpan = 6;
                 cell.className = "empty-state";
                 cell.textContent = versions.length ? "No versions match the current filter." : "No object versions found.";
                 row.appendChild(cell);
@@ -656,7 +655,6 @@
                 appendKeyCell(row, version);
                 appendCell(row, formatBytes(version.Size));
                 appendCell(row, formatModified(version));
-                appendCell(row, version.VersionId, "version-cell");
                 appendActionsCell(row, version);
                 body.appendChild(row);
             });
@@ -713,6 +711,15 @@
             const actions = document.createElement('div');
             actions.className = "actions";
 
+            if (isPdf(version)) {
+                const view = document.createElement('button');
+                view.type = "button";
+                view.className = "action-button";
+                view.textContent = "View";
+                view.addEventListener('click', () => viewVersion(version));
+                actions.appendChild(view);
+            }
+
             const download = document.createElement('button');
             download.type = "button";
             download.className = "action-button";
@@ -731,6 +738,25 @@
 
             cell.appendChild(actions);
             row.appendChild(cell);
+        }
+
+        function isPdf(version) {
+            return version.Key.toLowerCase().endsWith('.pdf');
+        }
+
+        function viewVersion(version) {
+            try {
+                setStatus(`Opening ${baseName(version.Key)}...`, "");
+                const signedUrl = getSignedObjectUrl(version);
+                const opened = window.open(signedUrl, '_blank', 'noopener');
+                if (!opened) {
+                    throw new Error("The browser blocked the new tab. Allow pop-ups for this site and try again.");
+                }
+                setStatus("PDF opened in a new tab.", "ok");
+            } catch (err) {
+                setStatus(err.message, "error");
+                console.error(err);
+            }
         }
 
         async function downloadVersion(version) {
