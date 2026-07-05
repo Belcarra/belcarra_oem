@@ -399,6 +399,8 @@
         const CLIENT_ID = '12fpm5rq8jg72uln5e8lesvntf';
         const IDENTITY_POOL_ID = `${REGION}:35df5fef-0f9e-4321-98ee-8b3433cb4ae7`;
         const S3_BUCKET = 'belcarra-oem-releases';
+        const VERIFIER_ORIGIN = 'https://verifier.belcarra.com';
+        const VERIFIER_READY_TIMEOUT_MS = 30000;
 
         const COGNITO_IDP_URL = `https://cognito-idp.${REGION}.amazonaws.com/`;
         const COGNITO_IDENTITY_URL = `https://cognito-identity.${REGION}.amazonaws.com/`;
@@ -685,12 +687,7 @@
         async function downloadVersion(version) {
             try {
                 setStatus(`Downloading ${baseName(version.Key)}...`, "");
-                const signedUrl = currentS3.getSignedUrl('getObject', {
-                    Bucket: S3_BUCKET,
-                    Key: version.Key,
-                    VersionId: version.VersionId,
-                    Expires: 300
-                });
+                const signedUrl = getSignedObjectUrl(version);
                 const link = document.createElement('a');
                 link.href = signedUrl;
                 link.download = baseName(version.Key);
@@ -704,9 +701,68 @@
             }
         }
 
-        function openVerifier(version) {
-            window.open('https://verifier.belcarra.com/', '_blank', 'noopener');
-            setStatus(`Verifier opened. Download ${baseName(version.Key)} and drop it there for now.`, "ok");
+        function getSignedObjectUrl(version) {
+            return currentS3.getSignedUrl('getObject', {
+                Bucket: S3_BUCKET,
+                Key: version.Key,
+                VersionId: version.VersionId,
+                Expires: 300
+            });
+        }
+
+        async function openVerifier(version) {
+            const fileName = baseName(version.Key);
+            let verifier = null;
+            let timeoutId = null;
+            let onVerifierReady = null;
+
+            try {
+                setStatus(`Opening verifier for ${fileName}...`, "");
+                const readyPromise = new Promise((resolve, reject) => {
+                    onVerifierReady = (event) => {
+                        if (event.origin !== VERIFIER_ORIGIN) return;
+                        if (event.source !== verifier) return;
+                        if (event.data?.type !== 'belcarra.sbom.verifier.ready') return;
+
+                        window.clearTimeout(timeoutId);
+                        window.removeEventListener('message', onVerifierReady);
+                        resolve();
+                    };
+
+                    timeoutId = window.setTimeout(() => {
+                        window.removeEventListener('message', onVerifierReady);
+                        reject(new Error("Verifier did not signal readiness."));
+                    }, VERIFIER_READY_TIMEOUT_MS);
+
+                    window.addEventListener('message', onVerifierReady);
+                });
+
+                verifier = window.open(`${VERIFIER_ORIGIN}/#receive`, 'belcarra-sbom-verifier');
+                if (!verifier) {
+                    throw new Error("Verifier window was blocked by the browser.");
+                }
+
+                await readyPromise;
+
+                setStatus(`Sending ${fileName} to verifier...`, "");
+                const response = await fetch(getSignedObjectUrl(version));
+                if (!response.ok) {
+                    throw new Error(`Download failed: ${response.status}`);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                verifier.postMessage({
+                    type: 'belcarra.sbom.package',
+                    name: fileName,
+                    arrayBuffer
+                }, VERIFIER_ORIGIN, [arrayBuffer]);
+                setStatus(`${fileName} sent to verifier.`, "ok");
+            } catch (err) {
+                if (timeoutId) window.clearTimeout(timeoutId);
+                if (onVerifierReady) window.removeEventListener('message', onVerifierReady);
+                setStatus(err.message, "error");
+                console.error(err);
+            }
         }
 
         function baseName(key) {
