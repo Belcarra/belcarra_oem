@@ -306,8 +306,17 @@
 
         .actions {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             flex-wrap: wrap;
+        }
+
+        .actions .action-button + .action-button::before {
+            content: "|";
+            display: inline-block;
+            margin-right: 8px;
+            color: var(--line);
+            font-weight: 400;
+            text-decoration: none;
         }
 
         .empty-state {
@@ -711,6 +720,13 @@
             const actions = document.createElement('div');
             actions.className = "actions";
 
+            const download = document.createElement('button');
+            download.type = "button";
+            download.className = "action-button";
+            download.textContent = "Download";
+            download.addEventListener('click', () => downloadVersion(version));
+            actions.appendChild(download);
+
             if (isPdf(version)) {
                 const view = document.createElement('button');
                 view.type = "button";
@@ -719,13 +735,6 @@
                 view.addEventListener('click', () => viewVersion(version));
                 actions.appendChild(view);
             }
-
-            const download = document.createElement('button');
-            download.type = "button";
-            download.className = "action-button";
-            download.textContent = "Download";
-            download.addEventListener('click', () => downloadVersion(version));
-            actions.appendChild(download);
 
             if (version.HasSbom) {
                 const verify = document.createElement('button');
