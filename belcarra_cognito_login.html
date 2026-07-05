@@ -579,7 +579,7 @@
             const filter = document.getElementById('filter-input').value.trim().toLowerCase();
             const body = document.getElementById('s3-versions-body');
             const filtered = versions.filter((version) => {
-                const haystack = `${version.Key} ${version.VersionId}`.toLowerCase();
+                const haystack = `${version.Key} ${displayKey(version.Key)} ${version.VersionId}`.toLowerCase();
                 return !filter || haystack.includes(filter);
             });
 
@@ -640,7 +640,8 @@
             const button = document.createElement('button');
             button.type = "button";
             button.className = "key-button";
-            button.textContent = version.Key;
+            button.textContent = displayKey(version.Key);
+            button.title = version.Key;
             button.addEventListener('click', () => downloadVersion(version));
             cell.appendChild(button);
             row.appendChild(cell);
@@ -767,6 +768,14 @@
 
         function baseName(key) {
             return key.split('/').pop() || key;
+        }
+
+        function displayKey(key) {
+            const prefix = document.getElementById('oem-id').textContent;
+            if (!prefix) return key;
+
+            const keyPrefix = `${prefix}/`;
+            return key.startsWith(keyPrefix) ? key.slice(keyPrefix.length) : key;
         }
 
         function formatBytes(bytes) {
