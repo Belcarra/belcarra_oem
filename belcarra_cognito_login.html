@@ -3,10 +3,745 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="0; url=web/belcarra_cognito_login.html">
-    <title>Belcarra OEM Archive</title>
+    <title>Belcarra OEM Release Archive</title>
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"></script>
+    <style>
+        :root {
+            --bg: #f5f7fb;
+            --panel: #ffffff;
+            --panel-soft: #f8fafc;
+            --text: #172033;
+            --muted: #667085;
+            --line: #d7dde8;
+            --brand: #0b66c3;
+            --brand-strong: #084f96;
+            --ok: #177245;
+            --warn: #a05a00;
+            --error: #b42318;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .shell {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 280px 1fr;
+        }
+
+        .sidebar {
+            background: #ffffff;
+            border-right: 1px solid var(--line);
+            padding: 24px 22px;
+        }
+
+        .brand {
+            font-weight: 700;
+            font-size: 20px;
+            color: var(--brand-strong);
+            margin-bottom: 6px;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.4;
+            margin-bottom: 28px;
+        }
+
+        .field {
+            margin-bottom: 14px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 6px;
+        }
+
+        input {
+            width: 100%;
+            height: 38px;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            padding: 8px 10px;
+            color: var(--text);
+            background: #ffffff;
+            font: inherit;
+        }
+
+        input:focus {
+            outline: 2px solid rgba(11, 102, 195, 0.18);
+            border-color: var(--brand);
+        }
+
+        button {
+            width: 100%;
+            height: 40px;
+            border: 0;
+            border-radius: 6px;
+            background: var(--brand);
+            color: #ffffff;
+            cursor: pointer;
+            font: inherit;
+            font-weight: 700;
+        }
+
+        button:hover {
+            background: var(--brand-strong);
+        }
+
+        button:disabled {
+            cursor: wait;
+            opacity: 0.72;
+        }
+
+        .status {
+            margin-top: 18px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            background: var(--panel-soft);
+            border: 1px solid var(--line);
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .status.ok {
+            color: var(--ok);
+            border-color: rgba(23, 114, 69, 0.25);
+            background: #f0f8f3;
+        }
+
+        .status.error {
+            color: var(--error);
+            border-color: rgba(180, 35, 24, 0.25);
+            background: #fff4f2;
+        }
+
+        main {
+            padding: 28px;
+            min-width: 0;
+        }
+
+        .header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 28px;
+            letter-spacing: 0;
+        }
+
+        .meta {
+            color: var(--muted);
+            font-size: 13px;
+            margin-top: 6px;
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .metric {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 14px;
+        }
+
+        .metric-label {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .metric-value {
+            margin-top: 5px;
+            font-size: 18px;
+            font-weight: 700;
+            word-break: break-word;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .panel-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--line);
+            background: var(--panel-soft);
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .filter {
+            max-width: 300px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        th, td {
+            padding: 11px 12px;
+            border-bottom: 1px solid var(--line);
+            text-align: left;
+            vertical-align: top;
+            font-size: 13px;
+        }
+
+        th {
+            color: #3f4a5f;
+            background: #ffffff;
+            font-weight: 700;
+        }
+
+        tbody tr:hover {
+            background: #f8fbff;
+        }
+
+        .key-cell, .version-cell {
+            word-break: break-word;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        }
+
+        .badge {
+            display: inline-block;
+            min-width: 52px;
+            text-align: center;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            background: #eef4ff;
+            color: var(--brand-strong);
+        }
+
+        .badge.old {
+            background: #f2f4f7;
+            color: #667085;
+        }
+
+        .badge.sbom {
+            margin-left: 6px;
+            background: #ecfdf3;
+            color: #067647;
+        }
+
+        .key-button, .action-button {
+            border: 0;
+            background: transparent;
+            color: var(--brand);
+            cursor: pointer;
+            font: inherit;
+            font-weight: 700;
+            padding: 0;
+            text-align: left;
+            width: auto;
+            height: auto;
+        }
+
+        .key-button:hover, .action-button:hover {
+            color: var(--brand-strong);
+            text-decoration: underline;
+            background: transparent;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .empty-state {
+            padding: 24px;
+            color: var(--warn);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 820px) {
+            .shell {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                border-right: 0;
+                border-bottom: 1px solid var(--line);
+            }
+
+            main {
+                padding: 20px 14px;
+            }
+
+            .header, .panel-toolbar {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .summary {
+                grid-template-columns: 1fr;
+            }
+
+            table {
+                min-width: 760px;
+            }
+
+            .panel {
+                overflow-x: auto;
+            }
+        }
+    </style>
 </head>
 <body>
-    <p><a href="web/belcarra_cognito_login.html">Open Belcarra OEM Archive</a></p>
+    <div class="shell">
+        <aside class="sidebar">
+            <div class="brand">Belcarra OEM Archive</div>
+            <div class="subtitle">Authenticate with Cognito to browse release files assigned to your OEM folder.</div>
+
+            <div class="field">
+                <label for="username">OEM Username</label>
+                <input type="text" id="username" autocomplete="username">
+            </div>
+
+            <div class="field">
+                <label for="password">Password</label>
+                <input type="password" id="password" autocomplete="current-password">
+            </div>
+
+            <button id="submit-btn">Sign In</button>
+            <div id="status-box" class="status">Ready to authenticate.</div>
+        </aside>
+
+        <main>
+            <div class="header">
+                <div>
+                    <h1>Release Files</h1>
+                    <div id="prefix-label" class="meta">No OEM prefix loaded.</div>
+                </div>
+            </div>
+
+            <section id="summary" class="summary hidden">
+                <div class="metric">
+                    <div class="metric-label">OEM Folder</div>
+                    <div id="oem-id" class="metric-value"></div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Object Versions</div>
+                    <div id="version-count" class="metric-value"></div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Latest Objects</div>
+                    <div id="latest-count" class="metric-value"></div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-toolbar">
+                    <div class="panel-title">S3 Object Versions</div>
+                    <input id="filter-input" class="filter" type="search" placeholder="Filter files or versions">
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 88px;">Status</th>
+                            <th style="width: 90px;">Flags</th>
+                            <th>Key</th>
+                            <th style="width: 90px;">Size</th>
+                            <th style="width: 180px;">Modified</th>
+                            <th>VersionId</th>
+                            <th style="width: 150px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="s3-versions-body">
+                        <tr>
+                            <td colspan="7" class="empty-state">Sign in to load release files.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const REGION = 'us-west-2';
+        const CLIENT_ID = '12fpm5rq8jg72uln5e8lesvntf';
+        const IDENTITY_POOL_ID = `${REGION}:35df5fef-0f9e-4321-98ee-8b3433cb4ae7`;
+        const S3_BUCKET = 'belcarra-oem-releases';
+
+        const COGNITO_IDP_URL = `https://cognito-idp.${REGION}.amazonaws.com/`;
+        const COGNITO_IDENTITY_URL = `https://cognito-identity.${REGION}.amazonaws.com/`;
+
+        let loadedVersions = [];
+        let currentS3 = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('submit-btn').addEventListener('click', signInAndListFiles);
+            document.getElementById('password').addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    signInAndListFiles();
+                }
+            });
+            document.getElementById('filter-input').addEventListener('input', () => {
+                renderS3Versions(loadedVersions);
+            });
+        });
+
+        async function signInAndListFiles() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const button = document.getElementById('submit-btn');
+
+            button.disabled = true;
+            loadedVersions = [];
+            currentS3 = null;
+            clearSummary();
+            renderS3Versions(loadedVersions);
+                setStatus("Authenticating with Cognito...", "");
+
+            try {
+                const authPayload = {
+                    ClientId: CLIENT_ID,
+                    AuthFlow: "USER_PASSWORD_AUTH",
+                    AuthParameters: { USERNAME: username, PASSWORD: password }
+                };
+
+                const authData = await awsJsonFetch(
+                    COGNITO_IDP_URL,
+                    'AWSCognitoIdentityProviderService.InitiateAuth',
+                    authPayload
+                );
+
+                const idToken = authData.AuthenticationResult.IdToken;
+                const tokenPayload = decodeJwtPayload(idToken);
+                const oemId = tokenPayload['custom:oem_id'];
+                if (!oemId) {
+                    throw new Error("Cognito token is missing custom:oem_id");
+                }
+
+                setStatus("Requesting temporary storage credentials...", "");
+                const loginKey = tokenPayload.iss.replace('https://', '');
+                const idData = await awsJsonFetch(
+                    COGNITO_IDENTITY_URL,
+                    'AWSCognitoIdentityService.GetId',
+                    {
+                        IdentityPoolId: IDENTITY_POOL_ID,
+                        Logins: { [loginKey]: idToken }
+                    }
+                );
+
+                const credsData = await awsJsonFetch(
+                    COGNITO_IDENTITY_URL,
+                    'AWSCognitoIdentityService.GetCredentialsForIdentity',
+                    {
+                        IdentityId: idData.IdentityId,
+                        Logins: { [loginKey]: idToken }
+                    }
+                );
+
+                if (!window.AWS) {
+                    throw new Error("AWS browser SDK did not load");
+                }
+
+                setStatus("Loading release file versions...", "");
+                const s3 = new AWS.S3({
+                    apiVersion: '2006-03-01',
+                    region: REGION,
+                    signatureVersion: 'v4',
+                    credentials: new AWS.Credentials({
+                        accessKeyId: credsData.Credentials.AccessKeyId,
+                        secretAccessKey: credsData.Credentials.SecretKey,
+                        sessionToken: credsData.Credentials.SessionToken
+                    })
+                });
+                currentS3 = s3;
+
+                const s3Prefix = `${oemId}/`;
+                const versionsData = await s3.listObjectVersions({
+                    Bucket: S3_BUCKET,
+                    Prefix: s3Prefix
+                }).promise();
+
+                loadedVersions = await addObjectMetadata(s3, versionsData.Versions || []);
+                updateSummary(oemId, s3Prefix, loadedVersions);
+                renderS3Versions(loadedVersions);
+                setStatus("Release file list loaded.", "ok");
+            } catch (err) {
+                loadedVersions = [];
+                renderError(err.message);
+                setStatus(err.message, "error");
+                console.error(err);
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        async function awsJsonFetch(url, target, payload) {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-amz-json-1.1',
+                    'X-Amz-Target': target
+                },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || JSON.stringify(data));
+            }
+            return data;
+        }
+
+        function decodeJwtPayload(token) {
+            const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+            return JSON.parse(window.atob(payload));
+        }
+
+        async function addObjectMetadata(s3, versions) {
+            return Promise.all(versions.map(async (version) => {
+                try {
+                    const head = await s3.headObject({
+                        Bucket: S3_BUCKET,
+                        Key: version.Key,
+                        VersionId: version.VersionId
+                    }).promise();
+                    const sourceMtime = head.Metadata ? head.Metadata['source-mtime'] : "";
+                    return {
+                        ...version,
+                        SourceMtime: sourceMtime || "",
+                        DisplayModified: sourceMtime ? new Date(sourceMtime) : version.LastModified,
+                        ModifiedSource: sourceMtime ? "source" : "s3",
+                        HasSbom: head.Metadata ? head.Metadata['has-sbom'] === "true" : false
+                    };
+                } catch (err) {
+                    return {
+                        ...version,
+                        SourceMtime: "",
+                        DisplayModified: version.LastModified,
+                        ModifiedSource: "s3",
+                        HasSbom: false
+                    };
+                }
+            }));
+        }
+
+        function updateSummary(oemId, prefix, versions) {
+            document.getElementById('summary').classList.remove('hidden');
+            document.getElementById('oem-id').textContent = oemId;
+            document.getElementById('version-count').textContent = String(versions.length);
+            document.getElementById('latest-count').textContent = String(versions.filter((item) => item.IsLatest).length);
+            document.getElementById('prefix-label').textContent = `s3://${S3_BUCKET}/${prefix}`;
+        }
+
+        function clearSummary() {
+            document.getElementById('summary').classList.add('hidden');
+            document.getElementById('oem-id').textContent = "";
+            document.getElementById('version-count').textContent = "";
+            document.getElementById('latest-count').textContent = "";
+            document.getElementById('prefix-label').textContent = "No OEM prefix loaded.";
+        }
+
+        function renderS3Versions(versions) {
+            const filter = document.getElementById('filter-input').value.trim().toLowerCase();
+            const body = document.getElementById('s3-versions-body');
+            const filtered = versions.filter((version) => {
+                const haystack = `${version.Key} ${version.VersionId}`.toLowerCase();
+                return !filter || haystack.includes(filter);
+            });
+
+            body.innerHTML = "";
+            if (!filtered.length) {
+                const row = document.createElement('tr');
+                const cell = document.createElement('td');
+                cell.colSpan = 7;
+                cell.className = "empty-state";
+                cell.textContent = versions.length ? "No versions match the current filter." : "No object versions found.";
+                row.appendChild(cell);
+                body.appendChild(row);
+                return;
+            }
+
+            filtered.forEach((version) => {
+                const row = document.createElement('tr');
+                const status = document.createElement('span');
+                status.className = version.IsLatest ? "badge" : "badge old";
+                status.textContent = version.IsLatest ? "Latest" : "Older";
+
+                const statusCell = document.createElement('td');
+                statusCell.appendChild(status);
+                row.appendChild(statusCell);
+
+                appendFlagsCell(row, version);
+                appendKeyCell(row, version);
+                appendCell(row, formatBytes(version.Size));
+                appendCell(row, formatModified(version));
+                appendCell(row, version.VersionId, "version-cell");
+                appendActionsCell(row, version);
+                body.appendChild(row);
+            });
+        }
+
+        function renderError(message) {
+            const body = document.getElementById('s3-versions-body');
+            body.innerHTML = "";
+            const row = document.createElement('tr');
+            const cell = document.createElement('td');
+            cell.colSpan = 7;
+            cell.className = "empty-state";
+            cell.textContent = `Unable to load files: ${message}`;
+            row.appendChild(cell);
+            body.appendChild(row);
+        }
+
+        function appendCell(row, text, className) {
+            const cell = document.createElement('td');
+            if (className) cell.className = className;
+            cell.textContent = text;
+            row.appendChild(cell);
+        }
+
+        function appendKeyCell(row, version) {
+            const cell = document.createElement('td');
+            cell.className = "key-cell";
+            const button = document.createElement('button');
+            button.type = "button";
+            button.className = "key-button";
+            button.textContent = version.Key;
+            button.addEventListener('click', () => downloadVersion(version));
+            cell.appendChild(button);
+            row.appendChild(cell);
+        }
+
+        function appendFlagsCell(row, version) {
+            const cell = document.createElement('td');
+            if (version.HasSbom) {
+                const badge = document.createElement('span');
+                badge.className = "badge sbom";
+                badge.textContent = "SBOM";
+                cell.appendChild(badge);
+            } else {
+                cell.textContent = "";
+            }
+            row.appendChild(cell);
+        }
+
+        function appendActionsCell(row, version) {
+            const cell = document.createElement('td');
+            const actions = document.createElement('div');
+            actions.className = "actions";
+
+            const download = document.createElement('button');
+            download.type = "button";
+            download.className = "action-button";
+            download.textContent = "Download";
+            download.addEventListener('click', () => downloadVersion(version));
+            actions.appendChild(download);
+
+            if (version.HasSbom) {
+                const verify = document.createElement('button');
+                verify.type = "button";
+                verify.className = "action-button";
+                verify.textContent = "Verify";
+                verify.addEventListener('click', () => openVerifier(version));
+                actions.appendChild(verify);
+            }
+
+            cell.appendChild(actions);
+            row.appendChild(cell);
+        }
+
+        async function downloadVersion(version) {
+            try {
+                setStatus(`Downloading ${baseName(version.Key)}...`, "");
+                const signedUrl = currentS3.getSignedUrl('getObject', {
+                    Bucket: S3_BUCKET,
+                    Key: version.Key,
+                    VersionId: version.VersionId,
+                    Expires: 300
+                });
+                const link = document.createElement('a');
+                link.href = signedUrl;
+                link.download = baseName(version.Key);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                setStatus("Download started.", "ok");
+            } catch (err) {
+                setStatus(err.message, "error");
+                console.error(err);
+            }
+        }
+
+        function openVerifier(version) {
+            window.open('https://verifier.belcarra.com/', '_blank', 'noopener');
+            setStatus(`Verifier opened. Download ${baseName(version.Key)} and drop it there for now.`, "ok");
+        }
+
+        function baseName(key) {
+            return key.split('/').pop() || key;
+        }
+
+        function formatBytes(bytes) {
+            if (!Number.isFinite(bytes)) return "";
+            if (bytes < 1024) return `${bytes} B`;
+            if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+            return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+        }
+
+        function formatDate(value) {
+            if (!value) return "";
+            return new Intl.DateTimeFormat(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit"
+            }).format(value);
+        }
+
+        function formatModified(version) {
+            const formatted = formatDate(version.DisplayModified || version.LastModified);
+            if (!formatted) return "";
+            return version.ModifiedSource === "source" ? `${formatted} (source)` : `${formatted} (S3)`;
+        }
+
+        function setStatus(message, state) {
+            const status = document.getElementById('status-box');
+            status.className = `status ${state || ""}`.trim();
+            status.textContent = message;
+        }
+    </script>
 </body>
 </html>
