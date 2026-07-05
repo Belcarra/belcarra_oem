@@ -225,6 +225,34 @@
             font-weight: 700;
         }
 
+        .sort-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 0;
+            background: transparent;
+            color: inherit;
+            cursor: pointer;
+            font: inherit;
+            font-weight: 700;
+            padding: 0;
+            text-align: left;
+            width: auto;
+            height: auto;
+        }
+
+        .sort-button:hover {
+            color: var(--brand-strong);
+            background: transparent;
+        }
+
+        .sort-indicator {
+            display: inline-block;
+            min-width: 10px;
+            color: var(--muted);
+            font-size: 11px;
+        }
+
         tbody tr:hover {
             background: #f8fbff;
         }
@@ -375,11 +403,23 @@
                 <table>
                     <thead>
                         <tr>
-                            <th style="width: 88px;">Status</th>
+                            <th style="width: 88px;" aria-sort="none">
+                                <button type="button" class="sort-button" data-sort-column="status">
+                                    Status <span class="sort-indicator" aria-hidden="true"></span>
+                                </button>
+                            </th>
                             <th style="width: 90px;">Flags</th>
-                            <th>Key</th>
+                            <th aria-sort="descending">
+                                <button type="button" class="sort-button" data-sort-column="key">
+                                    Key <span class="sort-indicator" aria-hidden="true"></span>
+                                </button>
+                            </th>
                             <th style="width: 90px;">Size</th>
-                            <th style="width: 180px;">Modified</th>
+                            <th style="width: 180px;" aria-sort="none">
+                                <button type="button" class="sort-button" data-sort-column="modified">
+                                    Modified <span class="sort-indicator" aria-hidden="true"></span>
+                                </button>
+                            </th>
                             <th>VersionId</th>
                             <th style="width: 150px;">Actions</th>
                         </tr>
@@ -407,6 +447,7 @@
 
         let loadedVersions = [];
         let currentS3 = null;
+        let sortState = { column: 'key', direction: 'desc' };
 
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('submit-btn').addEventListener('click', signInAndListFiles);
@@ -419,6 +460,12 @@
             document.getElementById('filter-input').addEventListener('input', () => {
                 renderS3Versions(loadedVersions);
             });
+            document.querySelectorAll('[data-sort-column]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    setSort(button.dataset.sortColumn);
+                });
+            });
+            updateSortHeaders();
         });
 
         async function signInAndListFiles() {
@@ -581,7 +628,7 @@
             const filtered = versions.filter((version) => {
                 const haystack = `${version.Key} ${displayKey(version.Key)} ${version.VersionId}`.toLowerCase();
                 return !filter || haystack.includes(filter);
-            });
+            }).sort(compareVersions);
 
             body.innerHTML = "";
             if (!filtered.length) {
@@ -613,6 +660,7 @@
                 appendActionsCell(row, version);
                 body.appendChild(row);
             });
+            updateSortHeaders();
         }
 
         function renderError(message) {
@@ -776,6 +824,63 @@
 
             const keyPrefix = `${prefix}/`;
             return key.startsWith(keyPrefix) ? key.slice(keyPrefix.length) : key;
+        }
+
+        function setSort(column) {
+            if (sortState.column === column) {
+                sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortState = {
+                    column,
+                    direction: column === 'key' ? 'desc' : 'asc'
+                };
+            }
+            renderS3Versions(loadedVersions);
+        }
+
+        function compareVersions(left, right) {
+            let result = 0;
+            if (sortState.column === 'status') {
+                result = Number(right.IsLatest) - Number(left.IsLatest);
+            } else if (sortState.column === 'modified') {
+                result = modifiedTime(left) - modifiedTime(right);
+            } else {
+                result = displayKey(left.Key).localeCompare(displayKey(right.Key), undefined, {
+                    numeric: true,
+                    sensitivity: 'base'
+                });
+            }
+
+            if (result === 0) {
+                result = displayKey(left.Key).localeCompare(displayKey(right.Key), undefined, {
+                    numeric: true,
+                    sensitivity: 'base'
+                });
+            }
+            return sortState.direction === 'desc' ? -result : result;
+        }
+
+        function modifiedTime(version) {
+            const value = version.DisplayModified || version.LastModified;
+            return value ? new Date(value).getTime() : 0;
+        }
+
+        function updateSortHeaders() {
+            document.querySelectorAll('[data-sort-column]').forEach((button) => {
+                const column = button.dataset.sortColumn;
+                const header = button.closest('th');
+                const indicator = button.querySelector('.sort-indicator');
+                const active = column === sortState.column;
+                if (header) {
+                    header.setAttribute(
+                        'aria-sort',
+                        active ? (sortState.direction === 'asc' ? 'ascending' : 'descending') : 'none'
+                    );
+                }
+                if (indicator) {
+                    indicator.textContent = active ? (sortState.direction === 'asc' ? '^' : 'v') : '';
+                }
+            });
         }
 
         function formatBytes(bytes) {
