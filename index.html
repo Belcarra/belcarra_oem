@@ -126,6 +126,13 @@
             background: #fff4f2;
         }
 
+        .page-version {
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
         main {
             padding: 28px;
             min-width: 0;
@@ -379,6 +386,7 @@
 
             <button id="submit-btn">Sign In</button>
             <div id="status-box" class="status">Ready to authenticate.</div>
+            <div id="page-version" class="page-version"></div>
         </aside>
 
         <main>
@@ -450,6 +458,7 @@
         const OEM_RELEASE_ROOT_PREFIX = 'oem';
         const VERIFIER_ORIGIN = 'https://verifier.belcarra.com';
         const VERIFIER_READY_TIMEOUT_MS = 30000;
+        const PAGE_VERSION = '2026.07.06.1';
 
         const COGNITO_IDP_URL = `https://cognito-idp.${REGION}.amazonaws.com/`;
         const COGNITO_IDENTITY_URL = `https://cognito-identity.${REGION}.amazonaws.com/`;
@@ -459,6 +468,7 @@
         let sortState = { column: 'key', direction: 'desc' };
 
         document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('page-version').textContent = `Page version ${PAGE_VERSION}`;
             document.getElementById('submit-btn').addEventListener('click', signInAndListFiles);
             document.getElementById('password').addEventListener('keydown', (event) => {
                 if (event.key === 'Enter') {
