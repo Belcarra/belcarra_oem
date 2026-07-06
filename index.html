@@ -447,6 +447,7 @@
         const CLIENT_ID = '12fpm5rq8jg72uln5e8lesvntf';
         const IDENTITY_POOL_ID = `${REGION}:35df5fef-0f9e-4321-98ee-8b3433cb4ae7`;
         const S3_BUCKET = 'belcarra-oem-releases';
+        const OEM_RELEASE_ROOT_PREFIX = 'oem';
         const VERIFIER_ORIGIN = 'https://verifier.belcarra.com';
         const VERIFIER_READY_TIMEOUT_MS = 30000;
 
@@ -545,7 +546,7 @@
                 });
                 currentS3 = s3;
 
-                const s3Prefix = `${oemId}/`;
+                const s3Prefix = `${OEM_RELEASE_ROOT_PREFIX}/${oemId}/`;
                 const versionsData = await s3.listObjectVersions({
                     Bucket: S3_BUCKET,
                     Prefix: s3Prefix
@@ -857,7 +858,7 @@
             const prefix = document.getElementById('oem-id').textContent;
             if (!prefix) return key;
 
-            const keyPrefix = `${prefix}/`;
+            const keyPrefix = `${OEM_RELEASE_ROOT_PREFIX}/${prefix}/`;
             return key.startsWith(keyPrefix) ? key.slice(keyPrefix.length) : key;
         }
 
